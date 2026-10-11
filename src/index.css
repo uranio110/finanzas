@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0a0f;
+  --color-surface: #13131a;
+  --color-surface-2: #1b1b24;
+  --color-border: #262631;
+  --color-text: #e8e8ec;
+  --color-text-muted: #9499a8;
+  --color-text-faint: #5c6070;
+  --color-accent: #8b7cf6;
+  --color-accent-soft: #8b7cf61a;
+  --color-income: #34d399;
+  --color-income-soft: #34d3991a;
+  --color-expense: #fb7185;
+  --color-expense-soft: #fb71851a;
+  --color-transfer: #38bdf8;
+  --color-transfer-soft: #38bdf81a;
+  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Thin, unobtrusive scrollbars that fit the dark theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
