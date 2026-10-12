@@ -100,17 +100,21 @@ function CreateAccountModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [icon, setIcon] = useState('👛')
   const [opening, setOpening] = useState('0')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const cents = parseAmountToCents(opening) ?? 0
     setSaving(true)
+    setError(null)
     try {
       await createAccount({ name, type, icon, openingBalanceCents: cents })
       setName('')
       setOpening('0')
       onClose()
       onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -129,6 +133,7 @@ function CreateAccountModal({ open, onClose, onCreated }: { open: boolean; onClo
         </Select>
         <EmojiPicker value={icon} onChange={setIcon} />
         <Input placeholder="Saldo inicial" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} />
+        {error && <p className="text-xs text-expense">{error}</p>}
         <Button type="submit" disabled={saving || !name}>
           {saving ? 'Guardando…' : 'Crear cuenta'}
         </Button>
@@ -150,6 +155,7 @@ function AdjustBalanceModal({
 }) {
   const [real, setReal] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -161,6 +167,7 @@ function AdjustBalanceModal({
       return
     }
     setSaving(true)
+    setError(null)
     try {
       // El ajuste es una transacción normal (kind='adjustment'): no se
       // sobrescribe ningún número, queda registrado en el historial.
@@ -174,6 +181,8 @@ function AdjustBalanceModal({
       })
       onClose()
       onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -193,6 +202,7 @@ function AdjustBalanceModal({
           onChange={(e) => setReal(e.target.value)}
           autoFocus
         />
+        {error && <p className="text-xs text-expense">{error}</p>}
         <Button type="submit" disabled={saving || !real}>
           {saving ? 'Guardando…' : 'Guardar ajuste'}
         </Button>

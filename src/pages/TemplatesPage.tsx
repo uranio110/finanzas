@@ -109,6 +109,7 @@ function CreateTemplateModal({
   const [categoryId, setCategoryId] = useState('')
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const filteredCategories = categories.filter((c) => c.kind === kind)
 
@@ -116,6 +117,7 @@ function CreateTemplateModal({
     e.preventDefault()
     if (!accountId) return
     setSaving(true)
+    setError(null)
     try {
       const cents = amount ? parseAmountToCents(amount) : null
       await createTemplate({
@@ -130,6 +132,8 @@ function CreateTemplateModal({
       setAmount('')
       onClose()
       onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -175,6 +179,7 @@ function CreateTemplateModal({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
+        {error && <p className="text-xs text-expense">{error}</p>}
         <Button type="submit" disabled={saving || !label}>
           {saving ? 'Guardando…' : 'Crear plantilla'}
         </Button>
@@ -194,16 +199,20 @@ function AmountPromptModal({
 }) {
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const cents = parseAmountToCents(amount)
     if (cents === null) return
     setSaving(true)
+    setError(null)
     try {
       await applyTemplate(template, cents)
       onApplied()
       onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -213,6 +222,7 @@ function AmountPromptModal({
     <Modal open onClose={onClose} title={template.label}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Input placeholder="Importe" inputMode="decimal" autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} />
+        {error && <p className="text-xs text-expense">{error}</p>}
         <Button type="submit" disabled={saving || !amount}>
           {saving ? 'Guardando…' : 'Registrar'}
         </Button>

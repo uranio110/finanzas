@@ -249,12 +249,14 @@ function TransactionForm({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const cents = parseAmountToCents(amount)
     if (cents === null || !accountId) return
     setSaving(true)
+    setError(null)
     try {
       await createTransaction({
         accountId,
@@ -265,6 +267,8 @@ function TransactionForm({
       })
       onClose()
       onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -292,6 +296,7 @@ function TransactionForm({
       </Select>
       <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       <Input placeholder="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      {error && <p className="text-xs text-expense">{error}</p>}
       <Button type="submit" disabled={saving || !amount}>
         {saving ? 'Guardando…' : 'Registrar'}
       </Button>

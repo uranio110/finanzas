@@ -119,15 +119,19 @@ function CreateCategoryModal({
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('🏷️')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setError(null)
     try {
       await createCategory({ name, kind, icon })
       setName('')
       onClose()
       onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -138,6 +142,7 @@ function CreateCategoryModal({
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Input placeholder="Nombre (ej. Almuerzo, Transporte)" value={name} onChange={(e) => setName(e.target.value)} required />
         <EmojiPicker value={icon} onChange={setIcon} />
+        {error && <p className="text-xs text-expense">{error}</p>}
         <Button type="submit" disabled={saving || !name}>
           {saving ? 'Guardando…' : 'Crear categoría'}
         </Button>
