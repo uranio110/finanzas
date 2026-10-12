@@ -3,6 +3,7 @@ import { listTemplates, createTemplate, deleteTemplate, applyTemplate } from '@/
 import { listAccounts } from '@/data/accounts'
 import { listCategories } from '@/data/categories'
 import { formatCurrency, parseAmountToCents } from '@/utils/currency'
+import { getErrorMessage } from '@/utils/errors'
 import type { Account, Category, CategoryKind, QuickTemplate } from '@/types/database'
 import { Card, PageHeader, Button, Input, Select, Modal, EmojiPicker, EmptyState } from '@/components/ui'
 
@@ -133,7 +134,7 @@ function CreateTemplateModal({
       onClose()
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -212,7 +213,7 @@ function AmountPromptModal({
       onApplied()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }

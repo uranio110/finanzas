@@ -3,6 +3,7 @@ import { listAccounts, createAccount, archiveAccount } from '@/data/accounts'
 import { listAccountBalances, type AccountBalance } from '@/data/balances'
 import { createTransaction } from '@/data/transactions'
 import { parseAmountToCents, formatCurrency } from '@/utils/currency'
+import { getErrorMessage } from '@/utils/errors'
 import type { Account, AccountType } from '@/types/database'
 import { Card, PageHeader, Button, Input, Select, Modal, EmojiPicker, EmptyState } from '@/components/ui'
 
@@ -114,7 +115,7 @@ function CreateAccountModal({ open, onClose, onCreated }: { open: boolean; onClo
       onClose()
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -182,7 +183,7 @@ function AdjustBalanceModal({
       onClose()
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }

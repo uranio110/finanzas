@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listCategories, createCategory, archiveCategory } from '@/data/categories'
 import type { Category, CategoryKind } from '@/types/database'
 import { Card, PageHeader, Button, Input, Modal, EmojiPicker, EmptyState } from '@/components/ui'
+import { getErrorMessage } from '@/utils/errors'
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -131,7 +132,7 @@ function CreateCategoryModal({
       onClose()
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }

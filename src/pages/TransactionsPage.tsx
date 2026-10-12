@@ -5,6 +5,7 @@ import { listAccounts } from '@/data/accounts'
 import { listCategories } from '@/data/categories'
 import { formatCurrency, parseAmountToCents } from '@/utils/currency'
 import { downloadCsv } from '@/utils/csv'
+import { getErrorMessage } from '@/utils/errors'
 import type { Account, Category, Transaction, Transfer } from '@/types/database'
 import { Card, PageHeader, Button, Input, Select, Modal, EmptyState } from '@/components/ui'
 
@@ -268,7 +269,7 @@ function TransactionForm({
       onClose()
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -323,7 +324,7 @@ function TransferForm({ accounts, onClose, onSaved }: { accounts: Account[]; onC
       onClose()
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar')
+      setError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
