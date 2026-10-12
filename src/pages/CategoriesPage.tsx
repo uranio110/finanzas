@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
-import { listCategories, createCategory, archiveCategory } from '@/data/categories'
-import type { Category, CategoryKind } from '@/types/database'
-import { Card, PageHeader, Button, Input, Modal, EmojiPicker, EmptyState } from '@/components/ui'
-import { getErrorMessage } from '@/utils/errors'
+import { listCategories, seedDefaultCategoriesIfEmpty, archiveCategory, updateCategoryIcon } from '@/data/categories'
+import type { Category } from '@/types/database'
+import { Card, PageHeader, EmptyState, EmojiPicker } from '@/components/ui'
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [createKind, setCreateKind] = useState<CategoryKind>('expense')
+  const [editingIconId, setEditingIconId] = useState<string | null>(null)
 
   async function reload() {
     setLoading(true)
+    await seedDefaultCategoriesIfEmpty()
     setCategories(await listCategories())
     setLoading(false)
   }
@@ -23,45 +22,45 @@ export function CategoriesPage() {
   const income = categories.filter((c) => c.kind === 'income')
   const expense = categories.filter((c) => c.kind === 'expense')
 
+  async function changeIcon(id: string, icon: string) {
+    await updateCategoryIcon(id, icon)
+    setEditingIconId(null)
+    reload()
+  }
+
+  async function archive(id: string) {
+    await archiveCategory(id)
+    reload()
+  }
+
   return (
     <div>
       <PageHeader title="Categorías" />
+      <p className="mb-4 text-xs text-text-faint">
+        Las categorías son fijas; lo único que puedes personalizar es el ícono de cada una. Toca el ícono para
+        cambiarlo.
+      </p>
 
       {!loading && (
         <div className="grid gap-4 sm:grid-cols-2">
           <CategoryGroup
             title="Gastos"
             items={expense}
-            onAdd={() => {
-              setCreateKind('expense')
-              setShowCreate(true)
-            }}
-            onArchive={async (id) => {
-              await archiveCategory(id)
-              reload()
-            }}
+            editingIconId={editingIconId}
+            onEditIcon={setEditingIconId}
+            onChangeIcon={changeIcon}
+            onArchive={archive}
           />
           <CategoryGroup
             title="Ingresos"
             items={income}
-            onAdd={() => {
-              setCreateKind('income')
-              setShowCreate(true)
-            }}
-            onArchive={async (id) => {
-              await archiveCategory(id)
-              reload()
-            }}
+            editingIconId={editingIconId}
+            onEditIcon={setEditingIconId}
+            onChangeIcon={changeIcon}
+            onArchive={archive}
           />
         </div>
       )}
-
-      <CreateCategoryModal
-        open={showCreate}
-        kind={createKind}
-        onClose={() => setShowCreate(false)}
-        onCreated={reload}
-      />
     </div>
   )
 }
@@ -69,85 +68,48 @@ export function CategoriesPage() {
 function CategoryGroup({
   title,
   items,
-  onAdd,
+  editingIconId,
+  onEditIcon,
+  onChangeIcon,
   onArchive,
 }: {
   title: string
   items: Category[]
-  onAdd: () => void
+  editingIconId: string | null
+  onEditIcon: (id: string | null) => void
+  onChangeIcon: (id: string, icon: string) => void
   onArchive: (id: string) => void
 }) {
   return (
     <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-text">{title}</h2>
-        <Button variant="secondary" onClick={onAdd}>
-          + Añadir
-        </Button>
-      </div>
+      <h2 className="mb-3 text-sm font-semibold text-text">{title}</h2>
       {items.length === 0 ? (
-        <EmptyState message="Sin categorías todavía." />
+        <EmptyState message="Sin categorías." />
       ) : (
         <ul className="flex flex-col gap-1">
           {items.map((c) => (
-            <li key={c.id} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-surface-2">
-              <span className="flex items-center gap-2 text-sm text-text">
-                <span>{c.icon}</span>
-                {c.name}
-              </span>
-              <button onClick={() => onArchive(c.id)} className="text-xs text-text-faint hover:text-expense">
-                Archivar
-              </button>
+            <li key={c.id} className="rounded-xl px-2 py-1.5 hover:bg-surface-2">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => onEditIcon(editingIconId === c.id ? null : c.id)}
+                  className="flex items-center gap-2 text-sm text-text"
+                >
+                  <span className="text-lg">{c.icon}</span>
+                  {c.name}
+                </button>
+                <button onClick={() => onArchive(c.id)} className="text-xs text-text-faint hover:text-expense">
+                  Archivar
+                </button>
+              </div>
+              {editingIconId === c.id && (
+                <div className="mt-2">
+                  <EmojiPicker value={c.icon} onChange={(icon) => onChangeIcon(c.id, icon)} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
     </Card>
-  )
-}
-
-function CreateCategoryModal({
-  open,
-  kind,
-  onClose,
-  onCreated,
-}: {
-  open: boolean
-  kind: CategoryKind
-  onClose: () => void
-  onCreated: () => void
-}) {
-  const [name, setName] = useState('')
-  const [icon, setIcon] = useState('🏷️')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await createCategory({ name, kind, icon })
-      setName('')
-      onClose()
-      onCreated()
-    } catch (err) {
-      setError(getErrorMessage(err))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title={kind === 'expense' ? 'Nueva categoría de gasto' : 'Nueva categoría de ingreso'}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Input placeholder="Nombre (ej. Almuerzo, Transporte)" value={name} onChange={(e) => setName(e.target.value)} required />
-        <EmojiPicker value={icon} onChange={setIcon} />
-        {error && <p className="text-xs text-expense">{error}</p>}
-        <Button type="submit" disabled={saving || !name}>
-          {saving ? 'Guardando…' : 'Crear categoría'}
-        </Button>
-      </form>
-    </Modal>
   )
 }

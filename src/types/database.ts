@@ -3,7 +3,7 @@
 // `number` (bigint de Postgres cabe en un JS number hasta 2^53, de sobra
 // para finanzas personales) -- nunca como float con decimales.
 
-export type AccountType = 'cash' | 'bank' | 'savings' | 'card' | 'other'
+export type AccountType = 'cash' | 'bank' | 'savings' | 'card' | 'piggy' | 'other'
 export type CategoryKind = 'income' | 'expense'
 export type TransactionKind = 'normal' | 'adjustment'
 
@@ -62,6 +62,10 @@ export interface QuickTemplate {
   account_id: string
   default_amount: number | null
   kind: CategoryKind
+  sort_order: number
+  is_recurring: boolean
+  recurrence_day: number | null // día del mes (1-31) en que se aplica sola
+  last_applied_at: string | null
 }
 
 export interface UserPreferences {

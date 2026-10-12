@@ -15,15 +15,14 @@ planes gratuitos.
 1. Crea un proyecto gratuito en [supabase.com](https://supabase.com) (tú, no
    un agente — requiere tu propia cuenta).
 2. En **SQL Editor**, ejecuta en orden el contenido completo de cada archivo
-   de [`supabase/migrations/`](supabase/migrations/): primero
-   [`0001_init.sql`](supabase/migrations/0001_init.sql) (tablas, políticas de
-   Row Level Security y funciones de autorización) y luego
-   [`0002_grants.sql`](supabase/migrations/0002_grants.sql) (permisos base
-   para el rol `authenticated` — sin esto, Postgres rechaza cualquier
-   consulta antes incluso de evaluar RLS, con un error de tipo "permission
-   denied for table ..."). Si creaste el proyecto con "Exponer
-   automáticamente nuevas tablas" desactivado (recomendado), este segundo
-   paso es obligatorio, no opcional.
+   de [`supabase/migrations/`](supabase/migrations/), uno por uno, en orden
+   numérico (`0001_init.sql`, `0002_grants.sql`, `0003_piggy_and_recurring.sql`,
+   `0004_fix_uncategorized_stats.sql`, y cualquiera que se añada después con
+   un número mayor). El `0002` (permisos base para el rol `authenticated`)
+   es el que más se olvida — sin él Postgres rechaza cualquier consulta
+   antes incluso de evaluar RLS, con un error de tipo "permission denied for
+   table ...". Si creaste el proyecto con "Exponer automáticamente nuevas
+   tablas" desactivado (recomendado), este paso es obligatorio, no opcional.
 3. En **Authentication → Providers**, activa **GitHub** como proveedor OAuth.
    Para obtener el *Client ID* y *Client Secret* que te pide:
    - Ve a GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**.
@@ -96,6 +95,15 @@ días sin actividad (plan gratuito). Usa los mismos secrets.
   no una mutación directa de un número — se conserva el historial completo.
 - **Importes en centavos (enteros)**, nunca `float`, para evitar errores de
   redondeo.
+- **Categorías fijas** (lista cerrada, solo se personaliza el ícono) para
+  mantener los informes simples — ver `FIXED_CATEGORIES` en
+  `src/data/categories.ts`.
+- **Cuentas tipo "alcancía"** se excluyen del saldo disponible mostrado en
+  Inicio/Movimientos, pero siguen registrando su propio historial.
+- **Plantillas recurrentes** ("gasto fijo") se aplican solas la primera vez
+  que se abre la app en o después del día configurado cada mes — no hay
+  ningún proceso en segundo plano (la app no tiene servidor propio), así que
+  no es automático si nadie abre la app ese mes.
 - Offline real (consultar y registrar movimientos sin conexión, sincronizado
   entre dispositivos) es Nivel 2 del plan, pendiente — hoy la app requiere
   conexión.

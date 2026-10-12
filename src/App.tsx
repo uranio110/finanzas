@@ -2,10 +2,9 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthContext'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { Layout } from '@/components/Layout'
-import { DashboardPage } from '@/pages/DashboardPage'
+import { HomePage } from '@/pages/HomePage'
 import { TransactionsPage } from '@/pages/TransactionsPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
-import { AccountsPage } from '@/pages/AccountsPage'
 import { CategoriesPage } from '@/pages/CategoriesPage'
 import { StatsPage } from '@/pages/StatsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
@@ -22,10 +21,9 @@ export default function App() {
               </RequireAuth>
             }
           >
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/movimientos" element={<TransactionsPage />} />
             <Route path="/rapidas" element={<TemplatesPage />} />
-            <Route path="/cuentas" element={<AccountsPage />} />
             <Route path="/categorias" element={<CategoriesPage />} />
             <Route path="/estadisticas" element={<StatsPage />} />
             <Route path="/ajustes" element={<SettingsPage />} />

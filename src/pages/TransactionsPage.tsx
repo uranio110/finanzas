@@ -1,57 +1,127 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listTransactions, createTransaction, deleteTransaction, type TransactionFilters } from '@/data/transactions'
+import { listTransactions, createTransaction, deleteTransaction } from '@/data/transactions'
 import { listTransfers, createTransfer, deleteTransfer } from '@/data/transfers'
 import { listAccounts } from '@/data/accounts'
 import { listCategories } from '@/data/categories'
 import { formatCurrency, parseAmountToCents } from '@/utils/currency'
 import { downloadCsv } from '@/utils/csv'
 import { getErrorMessage } from '@/utils/errors'
+import {
+  type Granularity,
+  getPeriodRange,
+  shiftPeriod,
+  formatPeriodLabel,
+  toDateInputValue,
+  toMonthInputValue,
+  toWeekInputValue,
+  dateInputValueToDate,
+  monthInputValueToDate,
+  weekInputValueToDate,
+} from '@/utils/period'
 import type { Account, Category, Transaction, Transfer } from '@/types/database'
-import { Card, PageHeader, Button, Input, Select, Modal, EmptyState } from '@/components/ui'
+import { Card, Button, Input, Select, Modal, EmptyState } from '@/components/ui'
 
-type Entry =
-  | { kind: 'transaction'; data: Transaction }
-  | { kind: 'transfer'; data: Transfer }
+type Entry = { kind: 'transaction'; data: Transaction } | { kind: 'transfer'; data: Transfer }
+
+function addDays(iso: string, delta: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + delta)
+  return toDateInputValue(d)
+}
+
+function balanceAsOf(
+  accountIds: string[],
+  asOfIso: string,
+  accounts: Account[],
+  transactions: Transaction[],
+  transfers: Transfer[],
+): number {
+  let total = 0
+  for (const id of accountIds) {
+    const acc = accounts.find((a) => a.id === id)
+    if (!acc) continue
+    let bal = acc.opening_balance
+    for (const t of transactions) if (t.account_id === id && t.occurred_at <= asOfIso) bal += t.amount
+    for (const tr of transfers) {
+      if (tr.occurred_at > asOfIso) continue
+      if (tr.destination_account_id === id) bal += tr.amount
+      if (tr.source_account_id === id) bal -= tr.amount
+    }
+    total += bal
+  }
+  return total
+}
 
 export function TransactionsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
+  const [allTransfers, setAllTransfers] = useState<Transfer[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
-  const [filters, setFilters] = useState<TransactionFilters>({})
+
+  const [granularity, setGranularity] = useState<Granularity>('month')
+  const [anchor, setAnchor] = useState(new Date())
+  const [accountFilter, setAccountFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   async function reload() {
     setLoading(true)
-    const [acc, cat, tx, tr] = await Promise.all([
-      listAccounts(),
-      listCategories(),
-      listTransactions(filters),
-      listTransfers(),
-    ])
+    const [acc, cat, tx, tr] = await Promise.all([listAccounts(), listCategories(), listTransactions(), listTransfers()])
     setAccounts(acc)
     setCategories(cat)
-    setTransactions(tx)
-    setTransfers(tr)
+    setAllTransactions(tx)
+    setAllTransfers(tr)
     setLoading(false)
   }
 
   useEffect(() => {
     reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.accountId, filters.categoryId, filters.from, filters.to, filters.kind])
+  }, [])
 
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? '—'
   const categoryOf = (id: string | null) => categories.find((c) => c.id === id)
 
+  const { from, to } = getPeriodRange(granularity, anchor)
+  const fromIso = toDateInputValue(from)
+  const toIso = toDateInputValue(to)
+
+  const scopeAccountIds = accountFilter ? [accountFilter] : accounts.filter((a) => a.type !== 'piggy').map((a) => a.id)
+
+  const saldoInicial = balanceAsOf(scopeAccountIds, addDays(fromIso, -1), accounts, allTransactions, allTransfers)
+  const saldoFinal = balanceAsOf(scopeAccountIds, toIso, accounts, allTransactions, allTransfers)
+
   const entries: Entry[] = useMemo(() => {
-    const txEntries: Entry[] = transactions.map((t) => ({ kind: 'transaction', data: t }))
-    const trEntries: Entry[] = filters.accountId || filters.categoryId || filters.kind
-      ? [] // las transferencias no tienen categoría/tipo ingreso-gasto; se ocultan al filtrar por esos campos
-      : transfers.map((t) => ({ kind: 'transfer', data: t }))
-    return [...txEntries, ...trEntries].sort((a, b) => b.data.occurred_at.localeCompare(a.data.occurred_at))
-  }, [transactions, transfers, filters])
+    const txEntries: Entry[] = allTransactions
+      .filter((t) => t.occurred_at >= fromIso && t.occurred_at <= toIso)
+      .filter((t) => !accountFilter || t.account_id === accountFilter)
+      .filter((t) => !categoryFilter || t.category_id === categoryFilter)
+      .map((t) => ({ kind: 'transaction', data: t }))
+    const trEntries: Entry[] =
+      categoryFilter
+        ? [] // las transferencias no tienen categoría
+        : allTransfers
+            .filter((t) => t.occurred_at >= fromIso && t.occurred_at <= toIso)
+            .filter((t) => !accountFilter || t.source_account_id === accountFilter || t.destination_account_id === accountFilter)
+            .map((t) => ({ kind: 'transfer', data: t }))
+    return [...txEntries, ...trEntries].sort(
+      (a, b) => b.data.occurred_at.localeCompare(a.data.occurred_at) || b.data.created_at.localeCompare(a.data.created_at),
+    )
+  }, [allTransactions, allTransfers, fromIso, toIso, accountFilter, categoryFilter])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Entry[]>()
+    for (const e of entries) {
+      const list = map.get(e.data.occurred_at) ?? []
+      list.push(e)
+      map.set(e.data.occurred_at, list)
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  }, [entries])
+
+  function dayNet(dayEntries: Entry[]): number {
+    return dayEntries.filter((e) => e.kind === 'transaction').reduce((s, e) => s + (e.data as Transaction).amount, 0)
+  }
 
   function exportCsv() {
     const rows = entries.map((e) => {
@@ -80,66 +150,164 @@ export function TransactionsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Movimientos"
-        action={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={exportCsv} disabled={entries.length === 0}>
-              Exportar CSV
-            </Button>
-            <Button onClick={() => setShowNew(true)}>+ Nuevo</Button>
-          </div>
-        }
-      />
+      <div className="mb-4 text-center">
+        <div className="text-xs text-text-muted">Saldo disponible</div>
+        <div className="text-3xl font-semibold text-text">{formatCurrency(saldoFinal)}</div>
+      </div>
 
-      <Card className="mb-4 grid gap-2 sm:grid-cols-4">
-        <Select
-          value={filters.accountId ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, accountId: e.target.value || undefined }))}
-        >
+      <div className="mb-3 flex items-center justify-center gap-3">
+        <button onClick={() => setAnchor(shiftPeriod(granularity, anchor, -1))} className="rounded-full p-2 text-lg text-text-muted hover:bg-surface-2">
+          ‹
+        </button>
+        <PeriodPicker granularity={granularity} anchor={anchor} onChange={setAnchor} />
+        <button onClick={() => setAnchor(shiftPeriod(granularity, anchor, 1))} className="rounded-full p-2 text-lg text-text-muted hover:bg-surface-2">
+          ›
+        </button>
+      </div>
+
+      <div className="mb-4 flex justify-center">
+        <div className="flex gap-1 rounded-full bg-surface-2 p-1">
+          {(['day', 'week', 'month'] as const).map((g) => (
+            <button
+              key={g}
+              onClick={() => setGranularity(g)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${granularity === g ? 'bg-accent text-white' : 'text-text-muted'}`}
+            >
+              {g === 'day' ? 'Día' : g === 'week' ? 'Semana' : 'Mes'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Card className="mb-4 flex justify-around text-center">
+        <div>
+          <div className="text-xs text-text-muted">Saldo inicial</div>
+          <div className="text-base font-semibold text-income">{formatCurrency(saldoInicial)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-text-muted">Saldo final</div>
+          <div className="text-base font-semibold text-income">{formatCurrency(saldoFinal)}</div>
+        </div>
+      </Card>
+
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        <Select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}>
           <option value="">Todas las cuentas</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.name}
+              {a.icon} {a.name}
             </option>
           ))}
         </Select>
-        <Select
-          value={filters.categoryId ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, categoryId: e.target.value || undefined }))}
-        >
+        <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
           <option value="">Todas las categorías</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.icon} {c.name}
             </option>
           ))}
         </Select>
-        <Input type="date" value={filters.from ?? ''} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined }))} />
-        <Input type="date" value={filters.to ?? ''} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined }))} />
-      </Card>
+      </div>
 
-      {!loading && entries.length === 0 && <EmptyState message="No hay movimientos con estos filtros." />}
+      <div className="mb-3 flex justify-end">
+        <button onClick={exportCsv} disabled={entries.length === 0} className="text-xs text-accent disabled:opacity-40">
+          Exportar CSV
+        </button>
+      </div>
 
-      <div className="flex flex-col gap-1">
-        {entries.map((e) => (
-          <EntryRow
-            key={e.data.id}
-            entry={e}
-            accountName={accountName}
-            category={e.kind === 'transaction' ? categoryOf(e.data.category_id) : undefined}
-            onDelete={async () => {
-              if (!confirm('¿Eliminar este movimiento?')) return
-              if (e.kind === 'transaction') await deleteTransaction(e.data.id)
-              else await deleteTransfer(e.data.id)
-              reload()
-            }}
-          />
+      {!loading && entries.length === 0 && <EmptyState message="No hay movimientos en este período." />}
+
+      <div className="flex flex-col gap-4 pb-20">
+        {grouped.map(([date, dayEntries]) => (
+          <div key={date}>
+            <div className="mb-1 flex items-baseline justify-between px-1">
+              <span className="text-sm text-text-muted">{formatDateHeader(date)}</span>
+              <span className={`text-sm font-semibold ${dayNet(dayEntries) >= 0 ? 'text-income' : 'text-expense'}`}>
+                {dayNet(dayEntries) >= 0 ? '+' : ''}
+                {formatCurrency(dayNet(dayEntries))}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {dayEntries.map((e) => (
+                <EntryRow
+                  key={e.data.id}
+                  entry={e}
+                  accountName={accountName}
+                  category={e.kind === 'transaction' ? categoryOf(e.data.category_id) : undefined}
+                  onDelete={async () => {
+                    if (!confirm('¿Eliminar este movimiento?')) return
+                    if (e.kind === 'transaction') await deleteTransaction(e.data.id)
+                    else await deleteTransfer(e.data.id)
+                    reload()
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
+      <button
+        onClick={() => setShowNew(true)}
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-white shadow-lg md:bottom-8 md:right-8"
+        aria-label="Añadir movimiento"
+      >
+        +
+      </button>
+
       <NewEntryModal open={showNew} onClose={() => setShowNew(false)} accounts={accounts} categories={categories} onSaved={reload} />
     </div>
+  )
+}
+
+function formatDateHeader(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  const weekday = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][d.getDay()]
+  const month = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  ][d.getMonth()]
+  return `${d.getDate()} de ${month}, ${weekday}`
+}
+
+function PeriodPicker({ granularity, anchor, onChange }: { granularity: Granularity; anchor: Date; onChange: (d: Date) => void }) {
+  const label = formatPeriodLabel(granularity, anchor)
+  if (granularity === 'month') {
+    return (
+      <label className="relative">
+        <span className="text-sm font-medium text-text">{label} ▾</span>
+        <input
+          type="month"
+          value={toMonthInputValue(anchor)}
+          onChange={(e) => e.target.value && onChange(monthInputValueToDate(e.target.value))}
+          className="absolute inset-0 opacity-0"
+        />
+      </label>
+    )
+  }
+  if (granularity === 'week') {
+    return (
+      <label className="relative">
+        <span className="text-sm font-medium text-text">{label} ▾</span>
+        <input
+          type="week"
+          value={toWeekInputValue(anchor)}
+          onChange={(e) => e.target.value && onChange(weekInputValueToDate(e.target.value))}
+          className="absolute inset-0 opacity-0"
+        />
+      </label>
+    )
+  }
+  return (
+    <label className="relative">
+      <span className="text-sm font-medium text-text">{label} ▾</span>
+      <input
+        type="date"
+        value={toDateInputValue(anchor)}
+        onChange={(e) => e.target.value && onChange(dateInputValueToDate(e.target.value))}
+        className="absolute inset-0 opacity-0"
+      />
+    </label>
   )
 }
 
@@ -161,17 +329,16 @@ function EntryRow({
   return (
     <Card className="flex items-center justify-between gap-3 py-3">
       <div className="flex items-center gap-3">
-        <span className="text-xl">{isTransfer ? '🔁' : category?.icon ?? '💤'}</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-2 text-lg">
+          {isTransfer ? '🔁' : category?.icon ?? '💤'}
+        </span>
         <div>
           <div className="text-sm text-text">
             {isTransfer
               ? `${accountName((entry.data as Transfer).source_account_id)} → ${accountName((entry.data as Transfer).destination_account_id)}`
               : category?.name ?? (entry.data as Transaction).note ?? 'Sin categoría'}
           </div>
-          <div className="text-xs text-text-muted">
-            {entry.data.occurred_at}
-            {!isTransfer && ` · ${accountName((entry.data as Transaction).account_id)}`}
-          </div>
+          {!isTransfer && <div className="text-xs text-text-muted">{accountName((entry.data as Transaction).account_id)}</div>}
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -204,12 +371,12 @@ function NewEntryModal({
 
   return (
     <Modal open={open} onClose={onClose} title="Nuevo movimiento">
-      <div className="mb-3 flex gap-1 rounded-md bg-surface-2 p-1">
+      <div className="mb-3 flex gap-1 rounded-xl bg-surface-2 p-1">
         {(['expense', 'income', 'transfer'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-medium ${tab === t ? 'bg-accent text-white' : 'text-text-muted'}`}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-medium ${tab === t ? 'bg-accent text-white' : 'text-text-muted'}`}
           >
             {t === 'expense' ? 'Gasto' : t === 'income' ? 'Ingreso' : 'Transferencia'}
           </button>

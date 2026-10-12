@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import clsx from 'clsx'
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={clsx('rounded-xl border border-border bg-surface p-4', className)}>{children}</div>
+  return <div className={clsx('rounded-2xl border border-border bg-surface p-4', className)}>{children}</div>
 }
 
 export function PageHeader({ title, action }: { title: string; action?: ReactNode }) {
@@ -23,7 +23,7 @@ export function Button({
   return (
     <button
       className={clsx(
-        'rounded-md px-3 py-2 text-sm font-medium transition disabled:opacity-50',
+        'rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-50',
         variant === 'primary' && 'bg-accent text-white hover:opacity-90',
         variant === 'secondary' && 'border border-border text-text hover:bg-surface-2',
         variant === 'danger' && 'text-expense hover:bg-expense-soft',
@@ -42,7 +42,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={clsx(
-        'w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-text placeholder:text-text-faint focus:border-accent focus:outline-none',
+        'w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-text placeholder:text-text-faint focus:border-accent focus:outline-none',
         props.className,
       )}
     />
@@ -54,7 +54,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={clsx(
-        'w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-text focus:border-accent focus:outline-none',
+        'w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-text focus:border-accent focus:outline-none',
         props.className,
       )}
     />
@@ -66,7 +66,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-xl border border-border bg-surface p-5"
+        className="w-full max-w-sm rounded-3xl border border-border bg-surface p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -81,7 +81,11 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   )
 }
 
-const EMOJI_CHOICES = ['👛', '🏦', '💰', '💳', '🐷', '🍔', '🚌', '🏠', '🛒', '🎉', '💊', '📚', '🎮', '✈️', '🧾', '💡']
+const EMOJI_CHOICES = [
+  '👛', '🏦', '💰', '💳', '🐷', '🍔', '🚌', '🏠',
+  '🛒', '🎉', '💊', '📚', '🎮', '✈️', '🧾', '💡',
+  '🎁', '💼', '🔁', '💵', '🛍️', '✨', '📱', '🚗',
+]
 
 export function EmojiPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -92,7 +96,7 @@ export function EmojiPicker({ value, onChange }: { value: string; onChange: (v: 
           type="button"
           onClick={() => onChange(emoji)}
           className={clsx(
-            'rounded-md py-1.5 text-lg',
+            'rounded-xl py-1.5 text-lg',
             value === emoji ? 'bg-accent-soft ring-1 ring-accent' : 'hover:bg-surface-2',
           )}
         >

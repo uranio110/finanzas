@@ -28,7 +28,7 @@ export function LoginPage() {
         </p>
         <button
           onClick={signOut}
-          className="mt-6 rounded-md border border-border px-4 py-2 text-sm text-text hover:bg-surface-2"
+          className="mt-6 rounded-full border border-border px-4 py-2 text-sm text-text hover:bg-surface-2"
         >
           Cerrar sesión
         </button>
@@ -44,7 +44,7 @@ export function LoginPage() {
       </p>
       <button
         onClick={signInWithGithub}
-        className="mt-6 flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        className="mt-6 flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
       >
         <GithubMark />
         Iniciar sesión con GitHub
