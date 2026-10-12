@@ -14,10 +14,16 @@ planes gratuitos.
 
 1. Crea un proyecto gratuito en [supabase.com](https://supabase.com) (tú, no
    un agente — requiere tu propia cuenta).
-2. En **SQL Editor**, pega y ejecuta el contenido completo de
-   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
-   Crea las tablas, las políticas de Row Level Security y las funciones de
-   autorización.
+2. En **SQL Editor**, ejecuta en orden el contenido completo de cada archivo
+   de [`supabase/migrations/`](supabase/migrations/): primero
+   [`0001_init.sql`](supabase/migrations/0001_init.sql) (tablas, políticas de
+   Row Level Security y funciones de autorización) y luego
+   [`0002_grants.sql`](supabase/migrations/0002_grants.sql) (permisos base
+   para el rol `authenticated` — sin esto, Postgres rechaza cualquier
+   consulta antes incluso de evaluar RLS, con un error de tipo "permission
+   denied for table ..."). Si creaste el proyecto con "Exponer
+   automáticamente nuevas tablas" desactivado (recomendado), este segundo
+   paso es obligatorio, no opcional.
 3. En **Authentication → Providers**, activa **GitHub** como proveedor OAuth.
    Para obtener el *Client ID* y *Client Secret* que te pide:
    - Ve a GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**.
