@@ -4,12 +4,10 @@ import { listAccounts, archiveAccount } from '@/data/accounts'
 import { listAccountBalances, type AccountBalance } from '@/data/balances'
 import { listTransactions } from '@/data/transactions'
 import { listCategories } from '@/data/categories'
-import { listTemplates, applyTemplate, applyDueRecurringTemplates } from '@/data/templates'
 import { formatCurrency } from '@/utils/currency'
-import type { Account, Category, QuickTemplate, Transaction } from '@/types/database'
+import type { Account, Category, Transaction } from '@/types/database'
 import { Card, PageHeader, Button, EmptyState } from '@/components/ui'
 import { CreateAccountModal, AdjustBalanceModal } from '@/components/AccountModals'
-import { CreateTemplateModal, AmountPromptModal } from '@/components/TemplateModals'
 
 function monthRange(date = new Date()) {
   const from = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10)
@@ -23,32 +21,25 @@ export function HomePage() {
   const [monthTx, setMonthTx] = useState<Transaction[]>([])
   const [recent, setRecent] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [templates, setTemplates] = useState<QuickTemplate[]>([])
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<string | null>(null)
 
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [adjustingAccount, setAdjustingAccount] = useState<Account | null>(null)
-  const [showCreateTemplate, setShowCreateTemplate] = useState(false)
-  const [applyingTemplate, setApplyingTemplate] = useState<QuickTemplate | null>(null)
 
   async function reload() {
     setLoading(true)
-    await applyDueRecurringTemplates()
     const { from, to } = monthRange()
-    const [acc, bal, tx, cat, tpl] = await Promise.all([
+    const [acc, bal, tx, cat] = await Promise.all([
       listAccounts(),
       listAccountBalances(),
       listTransactions({ from, to }),
       listCategories(),
-      listTemplates(),
     ])
     setAccounts(acc)
     setBalances(bal)
     setMonthTx(tx.filter((t) => t.kind === 'normal'))
     setRecent(tx.slice(0, 6))
     setCategories(cat)
-    setTemplates(tpl)
     setLoading(false)
   }
 
@@ -69,21 +60,9 @@ export function HomePage() {
   const net = income + expense
   const categoryOf = (id: string | null) => categories.find((c) => c.id === id)
 
-  async function quickApply(t: QuickTemplate) {
-    if (t.default_amount === null) {
-      setApplyingTemplate(t)
-      return
-    }
-    await applyTemplate(t)
-    setToast(`Registrado: ${t.label}`)
-    setTimeout(() => setToast(null), 1500)
-    reload()
-  }
-
   return (
     <div>
       <PageHeader title="Finanzas" action={<Button onClick={() => setShowCreateAccount(true)}>+ Nueva cuenta</Button>} />
-      {toast && <div className="mb-3 rounded-xl bg-income-soft px-3 py-2 text-sm text-income">{toast}</div>}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
@@ -108,31 +87,6 @@ export function HomePage() {
           {formatCurrency(net)}
         </div>
       </Card>
-
-      <section className="mt-5">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-muted">Accesos rápidos</h2>
-          <button onClick={() => setShowCreateTemplate(true)} className="text-xs text-accent">
-            + Nueva
-          </button>
-        </div>
-        {templates.length === 0 ? (
-          <EmptyState message="Crea una plantilla para registrar tus gastos habituales en un toque." />
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => quickApply(t)}
-                className="flex flex-col items-center gap-1 rounded-2xl border border-border bg-surface p-3 hover:bg-surface-2"
-              >
-                <span className="text-2xl">{t.icon}</span>
-                <span className="text-xs text-text">{t.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
 
       <section className="mt-5">
         <h2 className="mb-2 text-sm font-semibold text-text-muted">Cuentas</h2>
@@ -214,24 +168,6 @@ export function HomePage() {
           currentBalance={balanceFor(adjustingAccount.id)}
           onClose={() => setAdjustingAccount(null)}
           onSaved={reload}
-        />
-      )}
-      <CreateTemplateModal
-        open={showCreateTemplate}
-        onClose={() => setShowCreateTemplate(false)}
-        accounts={accounts}
-        categories={categories}
-        onCreated={reload}
-      />
-      {applyingTemplate && (
-        <AmountPromptModal
-          template={applyingTemplate}
-          onClose={() => setApplyingTemplate(null)}
-          onApplied={() => {
-            setToast(`Registrado: ${applyingTemplate.label}`)
-            setTimeout(() => setToast(null), 1500)
-            reload()
-          }}
         />
       )}
     </div>

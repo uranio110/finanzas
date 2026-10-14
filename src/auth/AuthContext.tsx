@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { syncDefaultCategories } from '@/data/categories'
+import { applyDueRecurringTemplates } from '@/data/templates'
 
 type AllowedStatus = 'checking' | 'allowed' | 'denied'
 
@@ -18,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [allowed, setAllowed] = useState<AllowedStatus>('checking')
+  const onboardedUserId = useRef<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -48,6 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
         setAllowed(data ? 'allowed' : 'denied')
+
+        // Al confirmar acceso, deja listas las categorías fijas y aplica los
+        // gastos/ingresos fijos que ya tocaran este mes. Una sola vez por
+        // usuario y carga de la app (no en cada refresco del token).
+        if (data && onboardedUserId.current !== session.user.id) {
+          onboardedUserId.current = session.user.id
+          syncDefaultCategories().catch((e) => console.error('[onboarding] syncDefaultCategories falló:', e))
+          applyDueRecurringTemplates().catch((e) => console.error('[onboarding] applyDueRecurringTemplates falló:', e))
+        }
       })
   }, [session])
 
